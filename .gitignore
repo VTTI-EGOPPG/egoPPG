@@ -1,1 +1,17 @@
 .idea/
+# Model checkpoints (too large for GitHub)
+models/**/*.pth
+
+# SLURM job script and logs
+train_fold.sh
+*.out
+
+# Preprocessed data (33 GB), only the README is versioned
+preprocessed_egoppg/*
+!preprocessed_egoppg/README.md
+
+# Training outputs: checkpoints and logs
+training_results/
+
+# Python cache
+__pycache__/
