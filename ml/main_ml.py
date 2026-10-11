@@ -76,17 +76,30 @@ def main():
     # Data input & output
     parser = argparse.ArgumentParser()
     parser.add_argument('--cfg_path', type=str, help='Name of the configuration file')
+    parser.add_argument('--seed', type=int, default=None, help='Run only this random seed (default: all seeds)')
+    parser.add_argument('--fold', type=int, default=None, help='Run only this cv split index (default: all splits)')
+    parser.add_argument('--epochs', type=int, default=None, help='Override TRAIN.EPOCHS (e.g. for quick tests)')
     args = parser.parse_args()
     print('input args:\n', json.dumps(vars(args), indent=4, separators=(',', ':')))  # pretty print args
 
     # Load configs
     config = get_config(args)
+    if args.epochs is not None:
+        config.defrost()
+        config.TRAIN.EPOCHS = args.epochs
+        config.freeze()
     print('Configuration:')
     print(config, end='\n\n')
     participants, participants_test = get_participants_lists(config)
 
     # Define random seeds to evaluate
     random_seeds = [0, 10, 100]
+    if args.seed is not None:
+        random_seeds = [args.seed]
+    # Suffix so that parallel jobs with different folds/seeds do not overwrite each other's summary files
+    file_suffix = '' if args.fold is None else f'_fold{args.fold}'
+    if args.seed is not None:
+        file_suffix += f'_seed{args.seed}'
     # random_seeds = [100]
 
     # Define metrics and tasks to evaluate
@@ -127,6 +140,8 @@ def main():
         results_seed = {label_signal: {task: {metric: list() for metric in test_metrics[label_signal]+['MAE_all']}
                                        for task in config.TASKS_EVALUATE} for label_signal in config.LABEL_SIGNALS}
         for i_split, cv_split in enumerate(cv_split_files['train'].keys()):
+            if args.fold is not None and i_split != args.fold:
+                continue
             print(f'Starting cross validation split: {cv_split}')
             data_loader_dict = dict()  # dictionary of data loaders
 
@@ -232,7 +247,7 @@ def main():
                         np.nanstd(results_seed[label_signal][task][metric]))
 
         # Write results of one seed
-        with open(log_testing_dir + '/all_evaluations.txt', 'w') as f:
+        with open(log_testing_dir + f'/all_evaluations{file_suffix}.txt', 'w') as f:
             f.write(f'Random seed: {random_seed}\n')
             f.write(f'Used participants: {participants}\n\n')
             for label_signal in config.LABEL_SIGNALS:
@@ -274,7 +289,7 @@ def main():
                       f'{round(np.nanstd(results_all_seeds_std[label_signal][task][metric]), 2)}\n')
 
     # Write results of all seeds
-    with open(config.LOG.PATH_TESTING + f'/all_seeds_evaluations.txt', 'w') as f:
+    with open(config.LOG.PATH_TESTING + f'/all_seeds_evaluations{file_suffix}.txt', 'w') as f:
         f.write(f'Used random seeds: {random_seeds}\n')
         f.write(f'Used participants: {participants}\n\n')
         for label_signal in config.LABEL_SIGNALS:
