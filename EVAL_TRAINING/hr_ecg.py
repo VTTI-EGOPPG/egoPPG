@@ -9,8 +9,11 @@ dropped, each assigned to the activity of its centre frame. In every window:
       gap between two activities, and RR intervals outside 0.3-2 s (30-200 bpm, missed or extra beats), are dropped.
 
 Metrics of PulseFormer vs PPG nose (the paper's metric: MAE, RMSE, MAPE, Pearson), computed as in
-evaluation/metrics_ppg.py: MAE/RMSE/MAPE over all windows, Pearson per participant over its windows and then averaged
-over participants. Written to results/fold_<k>/hr/hr_metrics.csv and results/hr_metrics.csv (all folds).
+evaluation/metrics_ppg.py, overall and per activity:
+    - results/fold_<k>/hr/hr_metrics.csv: the fold. MAE/RMSE/MAPE over all windows of the fold, Pearson per
+      participant over its windows and then averaged over participants
+    - results/fold_<k>/hr/hr_metrics_per_participant.csv: the same for every test participant alone
+    - results/hr_summary.csv: mean and std over the 5 folds of hr_metrics.csv
 
 Usage (from egoPPG-tricam/, after ppg_windows.py has saved the predictions):
     python -m EVAL_TRAINING.hr_ecg
@@ -36,7 +39,6 @@ DATA_ROOT = '/projects/aria_rppg/EgoPPG_Dataset'
 FS_ECG = 1024
 ACTIVITY_ORDER = ['video', 'office', 'walking', 'kitchen', 'dancing', 'bike']
 SOURCES = {'hr_pulseformer': 'PulseFormer', 'hr_ppg_nose': 'PPG nose (sensor)', 'hr_ecg': 'ECG'}
-COMPARISONS = [('hr_pulseformer', 'hr_ppg_nose')]  # the paper's metric; the ECG is only plotted
 
 
 def kept_frames(config, participant):
@@ -109,24 +111,33 @@ def plot_participant(df, fold, out_dir):
     plt.close(fig)
 
 
-def metrics(df):
-    """Rows: comparison x group (overall + activities). Same definitions as evaluation/metrics_ppg.py."""
-    rows = []
+def group_metrics(g, min_windows_pearson):
+    """PulseFormer vs PPG nose. Pearson per participant (if it has enough windows), averaged over participants."""
+    g = g.dropna(subset=['hr_pulseformer', 'hr_ppg_nose'])
+    err = g.hr_pulseformer - g.hr_ppg_nose
+    pearson = [np.corrcoef(p.hr_ppg_nose, p.hr_pulseformer)[0, 1] for _, p in g.groupby('participant')
+               if len(p) >= min_windows_pearson]
+    return {'n_windows': len(g), 'MAE': err.abs().mean(), 'RMSE': np.sqrt((err ** 2).mean()),
+            'MAPE': (err.abs() / g.hr_ppg_nose).mean() * 100,
+            'Pearson': np.mean(pearson) if pearson else np.nan}
+
+
+def metrics(df, min_windows_pearson=2):
+    """One row per group: overall + every activity (windows assigned by centre frame)."""
     groups = [('overall', df)] + [(a, df[df.activity == a]) for a in ACTIVITY_ORDER if a in set(df.activity)]
-    for est, ref in COMPARISONS:
-        for group, g in groups:
-            g = g.dropna(subset=[est, ref])
-            err = g[est] - g[ref]
-            pearson = [np.corrcoef(p[ref], p[est])[0, 1] for _, p in g.groupby('participant') if len(p) > 1]
-            rows.append({'comparison': f'{SOURCES[est]} vs {SOURCES[ref]}', 'group': group, 'n_windows': len(g),
-                         'MAE': err.abs().mean(), 'RMSE': np.sqrt((err ** 2).mean()),
-                         'MAPE': (err.abs() / g[ref]).mean() * 100, 'Pearson': np.nanmean(pearson)})
-    return pd.DataFrame(rows)
+    return pd.DataFrame([{'group': name, **group_metrics(g, min_windows_pearson)} for name, g in groups])
+
+
+def metrics_per_participant(df):
+    # A Pearson over 2 windows is always +-1, so at least 3 windows are required per participant and group
+    return pd.concat([metrics(p, min_windows_pearson=3).assign(participant=participant)
+                      for participant, p in df.groupby('participant')])[['participant', 'group', 'n_windows', 'MAE',
+                                                                         'RMSE', 'MAPE', 'Pearson']]
 
 
 def main():
     config = get_config(argparse.Namespace(cfg_path=CFG_PATH))
-    all_df = []
+    all_metrics = []
     for fold in range(5):
         files = sorted(glob.glob(f'{OUT_ROOT}/fold_{fold}/predictions/*.npy'))
         if not files:
@@ -143,14 +154,20 @@ def main():
             fold_df.append(df.assign(fold=fold))
             print(f'Fold {fold}, {participant}: {len(df)} windows -> {out_dir}/{participant}_hr.png')
         fold_df = pd.concat(fold_df, ignore_index=True)
-        metrics(fold_df).round(3).to_csv(f'{OUT_ROOT}/fold_{fold}/hr/hr_metrics.csv', index=False)
-        all_df.append(fold_df)
+        fold_metrics = metrics(fold_df)
+        fold_metrics.round(3).to_csv(f'{out_dir}/hr_metrics.csv', index=False)
+        metrics_per_participant(fold_df).round(3).to_csv(f'{out_dir}/hr_metrics_per_participant.csv', index=False)
+        all_metrics.append(fold_metrics.assign(fold=fold))
 
-    df = pd.concat(all_df, ignore_index=True)
-    m = metrics(df)
-    m.round(3).to_csv(f'{OUT_ROOT}/hr_metrics.csv', index=False)
-    print(f'\nAll folds: {df.participant.nunique()} participants, {len(df)} windows\n')
-    print(m.round(2).to_string(index=False))
+    # Mean and std over folds of every group (overall and each activity)
+    folds = pd.concat(all_metrics)
+    groups = list(dict.fromkeys(folds.group))
+    agg = {f'{m}_{stat}': (m, 'mean' if stat == 'mean' else (lambda x: x.std(ddof=0)))
+           for m in ['MAE', 'RMSE', 'MAPE', 'Pearson'] for stat in ['mean', 'std']}
+    hr_summary = folds.groupby('group').agg(n_folds=('fold', 'count'), n_windows=('n_windows', 'sum'), **agg)
+    hr_summary = hr_summary.reindex(groups)
+    hr_summary.round(3).to_csv(f'{OUT_ROOT}/hr_summary.csv')
+    print(f'\nMean and std over folds:\n{hr_summary.round(2).to_string()}')
 
 
 if __name__ == '__main__':

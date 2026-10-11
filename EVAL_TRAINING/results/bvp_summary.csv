@@ -1,0 +1,8 @@
+group,pearson_r_mean,pearson_r_std,n_folds,minutes
+overall,0.217,0.065,5,714.0
+video,0.52,0.107,5,116.267
+office,0.294,0.099,5,230.542
+walking,0.084,0.025,5,45.164
+kitchen,0.099,0.057,5,126.751
+dancing,-0.012,0.028,5,117.533
+bike,0.118,0.06,5,77.742

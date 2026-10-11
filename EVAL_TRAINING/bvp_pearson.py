@@ -7,7 +7,8 @@ activities. Pearson r is then computed on all samples pooled:
     - overall: all samples of all test participants of the fold(s)
     - per activity: all samples of that activity
     - per participant and activity
-for every fold (results/fold_<k>/bvp_pearson_*.csv) and for all folds together (results/bvp_pearson_*.csv).
+for every fold (results/fold_<k>/ppg/bvp_pearson_*.csv). results/bvp_summary.csv is the mean and std over the
+5 folds of the per-fold summaries (overall and per activity).
 
 Usage (from egoPPG-tricam/, after ppg_windows.py has saved the predictions):
     python -m EVAL_TRAINING.bvp_pearson
@@ -48,38 +49,39 @@ def summarize(df, out_prefix):
     activities = [a for a in ACTIVITY_ORDER if a in set(df.activity)]
     summary = pd.concat([pearson(df).to_frame('overall').T,
                          df.groupby('activity')[['sensor', 'model']].apply(pearson).reindex(activities)])
-    per_participant = (df.groupby(['fold', 'participant', 'activity'])[['sensor', 'model']].apply(pearson)
+    per_participant = (df.groupby(['participant', 'activity'])[['sensor', 'model']].apply(pearson)
                        .reset_index())
     summary.round(3).to_csv(f'{out_prefix}_summary.csv', index_label='group')
     per_participant.round(3).to_csv(f'{out_prefix}_per_participant.csv', index=False)
-    return summary, per_participant
+    return summary
 
 
 def main():
     config = get_config(argparse.Namespace(cfg_path=CFG_PATH))
 
-    samples = []
+    summaries = []
     for fold in range(5):
         fold_samples = []
         for f in sorted(glob.glob(f'{OUT_ROOT}/fold_{fold}/predictions/*.npy')):
             participant = os.path.basename(f).split('.')[0]
             pred, label = np.load(f)
-            fold_samples.append(participant_samples(config, participant, pred, label).assign(fold=fold))
+            fold_samples.append(participant_samples(config, participant, pred, label))
         if not fold_samples:
             print(f'Fold {fold}: no predictions found, skipped (run EVAL_TRAINING/ppg_windows.py first)')
             continue
-        fold_df = pd.concat(fold_samples, ignore_index=True)
-        summary, _ = summarize(fold_df, f'{OUT_ROOT}/fold_{fold}/bvp_pearson')
+        summary = summarize(pd.concat(fold_samples, ignore_index=True), f'{OUT_ROOT}/fold_{fold}/ppg/bvp_pearson')
         print(f"Fold {fold}: overall r = {summary.loc['overall', 'pearson_r']:.3f}")
-        samples.append(fold_df)
-    df = pd.concat(samples, ignore_index=True)
+        summaries.append(summary.assign(fold=fold))
 
-    summary, per_participant = summarize(df, f'{OUT_ROOT}/bvp_pearson')
-    print(f'\nAll folds: {df.participant.nunique()} participants, {len(df) / WINDOW:.0f} minutes\n')
-    print(summary.round(3).to_string())
-    print('\nPer participant and activity (pearson_r):')
-    print(per_participant.pivot(index='participant', columns='activity', values='pearson_r')
-          .reindex(columns=[a for a in ACTIVITY_ORDER if a in set(df.activity)]).round(2).to_string())
+    # Mean and std over folds of every group (overall and each activity)
+    folds = pd.concat(summaries).rename_axis('group').reset_index()
+    groups = ['overall'] + [a for a in ACTIVITY_ORDER if a in set(folds.group)]
+    bvp_summary = (folds.groupby('group')
+                   .agg(pearson_r_mean=('pearson_r', 'mean'), pearson_r_std=('pearson_r', lambda x: x.std(ddof=0)),
+                        n_folds=('fold', 'count'), minutes=('minutes', 'sum'))
+                   .reindex(groups))
+    bvp_summary.round(3).to_csv(f'{OUT_ROOT}/bvp_summary.csv')
+    print(f'\nMean and std over folds:\n{bvp_summary.round(3).to_string()}')
 
 
 if __name__ == '__main__':

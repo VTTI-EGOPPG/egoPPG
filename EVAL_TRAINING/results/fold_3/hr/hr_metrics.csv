@@ -1,8 +1,8 @@
-comparison,group,n_windows,MAE,RMSE,MAPE,Pearson
-PulseFormer vs PPG nose (sensor),overall,149,9.159,11.794,11.131,0.865
-PulseFormer vs PPG nose (sensor),video,22,5.885,9.612,9.282,0.611
-PulseFormer vs PPG nose (sensor),office,46,9.279,11.839,13.251,0.581
-PulseFormer vs PPG nose (sensor),walking,11,12.901,14.307,14.269,0.689
-PulseFormer vs PPG nose (sensor),kitchen,31,8.897,10.847,10.778,0.673
-PulseFormer vs PPG nose (sensor),dancing,22,7.808,9.074,8.34,0.256
-PulseFormer vs PPG nose (sensor),bike,17,12.873,16.333,10.012,0.796
+group,n_windows,MAE,RMSE,MAPE,Pearson
+overall,149,9.159,11.794,11.131,0.865
+video,22,5.885,9.612,9.282,0.611
+office,46,9.279,11.839,13.251,0.581
+walking,11,12.901,14.307,14.269,0.689
+kitchen,31,8.897,10.847,10.778,0.673
+dancing,22,7.808,9.074,8.34,0.256
+bike,17,12.873,16.333,10.012,0.796
