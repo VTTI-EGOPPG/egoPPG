@@ -1,8 +1,8 @@
 # Configurations for video and biosignals of egoPPG dataset
 
 # General parameters
-original_data_path: '/local/data/bjbraun/Datasets/SynchronizedData/egoPPG'
-preprocessed_data_path: '/local/data/bjbraun/Datasets/PreprocessedData/egoPPG'
+original_data_path: '/projects/aria_rppg/EgoPPG_Dataset'
+preprocessed_data_path: '/projects/aria_rppg/martina_egoPPG/egoPPG-tricam/preprocessed_egoppg'
 fs_all: {'et': 30, 'aria_imu_right': 1000, 'ms_ecg': 1024}
 tasks: ['video', 'office', 'kitchen', 'dancing', 'bike', 'walking']
 

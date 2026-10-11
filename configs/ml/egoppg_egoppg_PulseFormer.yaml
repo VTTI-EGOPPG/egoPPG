@@ -1,5 +1,5 @@
 BASE: ['']
-TOOLBOX_MODE: "only_test"      # "train_and_test"  or "only_test"
+TOOLBOX_MODE: "train_and_test"      # "train_and_test"  or "only_test"
 INPUT_SIGNALS: ['et', 'imu_right']  # can be one or multiple depending on model
 LABEL_SIGNALS: ["ppg_nose"]  # can be one or multiple depending on model
 TASKS_TO_USE: ['video', 'office', 'kitchen', 'dancing', 'bike', 'walking']
@@ -8,7 +8,7 @@ NAME_EXTENSION: ""  # optional, just to add some extra information to the name
 # 10% of training data is used for validation per default. Change in ml_helper.py if needed
 SPLIT_METHOD: "kfold"  # loso, kfold or cross_dataset (train and valid on one dataset, test on another)
 K_FOLD_SPLITS: 5  # if k_fold is used, specify number of splits for k_fold
-DEVICE: cuda:3
+DEVICE: cuda:0
 NUM_OF_GPU_TRAIN: 1
 
 TRAIN:
@@ -20,7 +20,7 @@ TRAIN:
     FS: 30
     DATASET: egoppg  # egoppg
     DATA_FORMAT: NCDHW
-    CACHED_PATH: "/Datasets/PreprocessedData/egoPPG"  # where the preprocessed data is saved, relative to the DATA_PATH
+    CACHED_PATH: "/egoPPG-tricam/preprocessed_egoppg" # where the preprocessed data is saved, relative to the DATA_PATH
     PREPROCESS:
       DATA_TYPE: ['DiffStandardized']  # Raw, Standardized, Diff, DiffStandardized, DiffStandardizedExtended
       LABEL_TYPE: 'DiffStandardized'   # Raw, Standardized, Diff, DiffStandardized
@@ -37,7 +37,7 @@ TEST:
     FS: 30
     DATASET: egoppg  # egoppg
     DATA_FORMAT: NCDHW
-    CACHED_PATH: "/Datasets/PreprocessedData/egoPPG"  # where the preprocessed data is saved, relative to the DATA_PATH
+    CACHED_PATH:  "/egoPPG-tricam/preprocessed_egoppg"  # where the preprocessed data is saved, relative to the DATA_PATH
     PREPROCESS:
       DATA_TYPE: ['DiffStandardized']  # Raw, Standardized, Diff, DiffStandardized, DiffStandardizedExtended
       LABEL_TYPE: 'DiffStandardized'   # Raw, Standardized, Diff, DiffStandardized
@@ -48,14 +48,14 @@ TEST:
         H: 48
         W: 128
 
-DATA_PATH: "/local/data/bjbraun"  # where the big data is saved (DATA_PATH and FILE_PATH could be the same depending on server)
-FILE_PATH: "/local/home/bjbraun"  # folder for smaller files of the projects
+DATA_PATH: "/projects/aria_rppg/martina_egoPPG"  # where the big data is saved (DATA_PATH and FILE_PATH could be the same depending on server)
+FILE_PATH: "/projects/aria_rppg/martina_egoPPG/egoPPG-tricam"  # folder for smaller files of the projects
 LOG:
-  PATH_TRAINING: "/Projects/egoPPG/runs/training"  # where the training logs are saved, relative to the FILE_PATH
-  PATH_TESTING: "/Projects/egoPPG/runs/testing"    # where the testing logs are saved, relative to the FILE_PATH
+  PATH_TRAINING: "/training_results/runs/training"  # where the training logs are saved, relative to the FILE_PATH
+  PATH_TESTING: "/training_results/runs/testing"   # where the testing logs are saved, relative to the FILE_PATH
 MODEL:
   NAME: PulseFormer
-  PATH_MODEL: '/Projects/egoPPG/PreTrainedModels'  # where the pre-trained models are saved, relative to the DATA_PATH
+  PATH_MODEL:  '/egoPPG-tricam/training_results/PreTrainedModels'  # where the pre-trained models are saved, relative to the DATA_PATH
 INFERENCE:
   USE_BEST_EPOCH: True
   BATCH_SIZE: 1
